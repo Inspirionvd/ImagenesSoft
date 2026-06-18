@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Catálogo Profesional & Gestor de Stock</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* --- ESTILOS GENERALES --- */
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .no-print-container { max-width: 1100px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2 { color: #1a73e8; margin-top: 0; font-size: 20px; border-bottom: 2px solid #e8f0fe; padding-bottom: 8px; }
+        .upload-grid { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 15px 0; margin: 15px -15px; }
+        .upload-col { display: table-cell; width: 33.33%; vertical-align: top; }
+        .upload-area { border: 2px dashed #1a73e8; padding: 25px 15px; border-radius: 6px; background: #f8fafd; cursor: pointer; position: relative; text-align: center; height: 80px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .file-status { font-size: 13px; font-weight: bold; color: #137333; margin-top: 5px; display: none; }
+        .filter-grid { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 12px 0; margin-bottom: 15px; }
+        .filter-col { display: table-cell; vertical-align: top; }
+        .filter-col label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px; text-transform: uppercase; }
+        .filter-col select { width: 100%; padding: 6px; border: 1px solid #ccd1d9; border-radius: 4px; font-size: 13px; background-color: #fff; height: 130px; }
+        .btn { background-color: #1a73e8; color: white; border: none; padding: 10px 22px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-left: 10px; }
+        .btn-secondary { background-color: #5c6bc0; }
+        #mensaje { font-size: 14px; font-weight: 500; padding: 12px; border-radius: 4px; margin-bottom: 20px; display: none; text-align: center; }
+        .success { background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+        .error { background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf; }
+        .product-card { background: #fff; border: 2px solid #7f8c8d; border-radius: 6px; margin-bottom: 6px; display: block; overflow: hidden; }
+        .product-layout { display: table; width: 100%; table-layout: fixed; }
+        .product-img-box { display: table-cell; width: 130px; height: 130px; border-right: 2px solid #7f8c8d; text-align: center; vertical-align: middle; }
+        .product-details { display: table-cell; vertical-align: top; padding: 10px 15px; }
+        .tag-badge { display: inline-block; background: #f1f3f4; color: #3c4043; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-right: 6px; border: 1px solid #dadce0; }
+        .tag-badge-linea { background: #e1f5fe; color: #0277bd; border-color: #b3e5fc; }
+        .product-prices { display: table-cell; width: 160px; vertical-align: middle; text-align: right; padding: 10px; border-left: 1px solid #f0f0f0; }
+    </style>
+</head>
+<body>
+
+<div class="no-print-container">
+    <div id="mensaje"></div>
+    <div class="card">
+        <h2>1. Parámetros Base y Carga de Orígenes</h2>
+        <div class="upload-grid">
+            <div class="upload-col">
+                <div class="upload-area" id="dropZoneStock"><span id="txtStock">📦 Cargar Archivo de Stock (Bloques)</span><input type="file" id="fileStock" accept=".xlsx, .xls"></div>
+                <div id="statusStock" class="file-status">✓ Stock cargado</div>
+            </div>
+            <div class="upload-col">
+                <div class="upload-area" id="dropZonePrecios"><span id="txtPrecios">💰 Cargar Lista de Precios Maestros</span><input type="file" id="filePrecios" accept=".xlsx, .xls"></div>
+                <div id="statusPrecios" class="file-status">✓ Precios cargados</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="panelFiltros" style="opacity: 0.5; pointer-events: none;">
+        <h2>2. Panel de Segmentación</h2>
+        <div class="filter-grid">
+            <div class="filter-col"><label>Artículo</label><select id="selArticulo" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select></div>
+            <div class="filter-col"><label>Color</label><select id="selColor" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select></div>
+            <div class="filter-col"><label>Marca</label><select id="selMarca" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select></div>
+            <div class="filter-col"><label>Marca V2</label><select id="selMarcaV2" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select></div>
+            <div class="filter-col"><label>Línea</label><select id="selLinea" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select></div>
+            <div class="filter-col"><label>Impresión</label><select id="selImpresion" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select></div>
+        </div>
+        <button class="btn btn-secondary" onclick="limpiarSelectoresFiltros()">Restablecer Filtros</button>
+    </div>
+</div>
+
+<div class="catalog-container" id="vistaCatalogo" style="display:none;"><table style="width:100%"><tbody id="contenedorCards"></tbody></table></div>
+
+<script>
+    var globalStockRaw = [];
+    var globalPreciosMap = {};
+    var globalMasterData = [];
+
+    document.getElementById('fileStock').addEventListener('change', function(e) { if (e.target.files.length > 0) procesarExcelStock(e.target.files[0]); });
+    document.getElementById('filePrecios').addEventListener('change', function(e) { if (e.target.files.length > 0) procesarExcelPrecios(e.target.files[0]); });
+
+    function procesarExcelStock(archivo) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, {type: 'array'});
+            var hojaOrig = workbook.Sheets[workbook.SheetNames[0]];
+            var rango = XLSX.utils.decode_range(hojaOrig['!ref']);
+            globalStockRaw = [];
+            var codigoArticuloActual = "";
+            var arrayTallesActuales = [];
+            for (var r = 0; r <= rango.e.r; r++) {
+                var valA = obtenerValorCelda(hojaOrig, r, 0);
+                var valB = obtenerValorCelda(hojaOrig, r, 1);
+                if (valA !== "" && valB !== "" && obtenerValorCelda(hojaOrig, r, 2) === "") {
+                    codigoArticuloActual = valA.toUpperCase();
+                    for (var c = 4; c <= 18; c++) arrayTallesActuales[c] = obtenerValorCelda(hojaOrig, r, c);
+                    continue;
+                }
+                if (codigoArticuloActual !== "") {
+                    for (var c = 4; c <= 18; c++) {
+                        var cant = obtenerValorCelda(hojaOrig, r, c);
+                        if (cant !== "" && !isNaN(cant) && Number(cant) > 0) {
+                            globalStockRaw.push({ articulo: codigoArticuloActual, codigoColor: valA, color: valB, marca: obtenerValorCelda(hojaOrig, r, 2), talle: arrayTallesActuales[c], cantidad: Number(cant) });
+                        }
+                    }
+                }
+            }
+            document.getElementById('statusStock').style.display = 'block';
+            verificarConsolidacion();
+        };
+        reader.readAsArrayBuffer(archivo);
+    }
+
+    function procesarExcelPrecios(archivo) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            var hoja = workbook.Sheets[workbook.SheetNames[0]];
+            var rango = XLSX.utils.decode_range(hoja['!ref']);
+            globalPreciosMap = {};
+            for (var r = 0; r <= rango.e.r; r++) {
+                var artId = obtenerValorCelda(hoja, r, 0);
+                if (artId === "" || r === 0) continue;
+                globalPreciosMap[artId.toUpperCase().replace(/\s+/g, '')] = {
+                    precio: normalizarNumeroExcel(obtenerValorCelda(hoja, r, 3)),
+                    marcaV2: obtenerValorCelda(hoja, r, 7) || "N/A",
+                    precioPromo: normalizarNumeroExcel(obtenerValorCelda(hoja, r, 8)),
+                    tipoVenta: obtenerValorCelda(hoja, r, 9) || "libre",
+                    impresion: obtenerValorCelda(hoja, r, 10) || "N/A",
+                    linea: obtenerValorCelda(hoja, r, 11) || "N/A"
+                };
+            }
+            document.getElementById('statusPrecios').style.display = 'block';
+            verificarConsolidacion();
+        };
+        reader.readAsArrayBuffer(archivo);
+    }
+
+    function verificarConsolidacion() {
+        if (globalStockRaw.length === 0 || Object.keys(globalPreciosMap).length === 0) return;
+        var mapa = {};
+        globalStockRaw.forEach(function(st) {
+            var key = st.articulo.toUpperCase().replace(/\s+/g, '') + "|||" + st.codigoColor;
+            if (!mapa[key]) {
+                var p = globalPreciosMap[st.articulo.toUpperCase().replace(/\s+/g, '')] || { precio:0, marcaV2:"N/A", precioPromo:0, tipoVenta:"libre", impresion:"N/A", linea:"N/A" };
+                mapa[key] = { ...st, ...p, tallesData: [] };
+            }
+            mapa[key].tallesData.push({ talle: st.talle, cantidad: st.cantidad });
+        });
+        globalMasterData = Object.values(mapa);
+        document.getElementById('panelFiltros').style.opacity = '1';
+        document.getElementById('panelFiltros').style.pointerEvents = 'auto';
+        inyectarSelectores();
+        ejecutarFiltrosMapeados();
+    }
+
+    function inyectarSelectores() {
+        var sets = { art: new Set(), col: new Set(), mrc: new Set(), mv2: new Set(), lin: new Set(), imp: new Set() };
+        globalMasterData.forEach(function(i) {
+            sets.art.add(i.articulo); sets.col.add(i.color); sets.mrc.add(i.marca);
+            sets.mv2.add(i.marcaV2); sets.lin.add(i.linea); sets.imp.add(i.impresion);
+        });
+        cargarSelect('selArticulo', sets.art); cargarSelect('selColor', sets.col);
+        cargarSelect('selMarca', sets.mrc); cargarSelect('selMarcaV2', sets.mv2);
+        cargarSelect('selLinea', sets.lin); cargarSelect('selImpresion', sets.imp);
+    }
+
+    function cargarSelect(id, set) {
+        var el = document.getElementById(id);
+        el.innerHTML = '<option value="TODOS" selected>-- TODOS --</option>';
+        Array.from(set).sort().forEach(v => { var o = document.createElement('option'); o.value = v; o.text = v; el.appendChild(o); });
+    }
+
+    function ejecutarFiltrosMapeados() {
+        var fA = obtenerSel('selArticulo'), fC = obtenerSel('selColor'), fM = obtenerSel('selMarca'), fV = obtenerSel('selMarcaV2'), fL = obtenerSel('selLinea'), fI = obtenerSel('selImpresion');
+        var res = globalMasterData.filter(i => (fA.includes("TODOS") || fA.includes(i.articulo)) && (fC.includes("TODOS") || fC.includes(i.color)) && (fM.includes("TODOS") || fM.includes(i.marca)) && (fV.includes("TODOS") || fV.includes(i.marcaV2)) && (fL.includes("TODOS") || fL.includes(i.linea)) && (fI.includes("TODOS") || fI.includes(i.impresion)));
+        renderizar(res);
+    }
+
+    function renderizar(datos) {
+        var cont = document.getElementById('contenedorCards');
+        cont.innerHTML = "";
+        document.getElementById('vistaCatalogo').style.display = 'block';
+        datos.forEach(p => {
+            cont.innerHTML += `<tr><td><div class="product-card"><div class="product-layout"><div class="product-img-box">${p.articulo}</div><div class="product-details"><strong>Art: ${p.articulo}</strong><br><span class="tag-badge">${p.marca}</span><span class="tag-badge tag-badge-linea">Línea: ${p.linea}</span></div><div class="product-prices">$${p.precio}</div></div></div></td></tr>`;
+        });
+    }
+
+    function obtenerValorCelda(h, r, c) { var celda = h[XLSX.utils.encode_cell({r:r, c:c})]; return celda ? celda.v.toString() : ""; }
+    function normalizarNumeroExcel(v) { return isNaN(v) ? 0 : Number(v); }
+    function obtenerSel(id) { var s = document.getElementById(id); var res = Array.from(s.options).filter(o => o.selected).map(o => o.value); return res.includes("TODOS") ? ["TODOS"] : res; }
+    function limpiarSelectoresFiltros() { ['selArticulo','selColor','selMarca','selMarcaV2','selLinea','selImpresion'].forEach(id => { var s = document.getElementById(id); for(var i=0; i<s.options.length; i++) s.options[i].selected = (s.options[i].value === "TODOS"); }); ejecutarFiltrosMapeados(); }
+</script>
+</body>
+</html>

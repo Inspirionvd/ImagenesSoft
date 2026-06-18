@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Catálogo Profesional & Gestor de Stock</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* --- ESTILOS GENERALES DE LA INTERFAZ DE USUARIO --- */
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .no-print-container { max-width: 1100px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2 { color: #1a73e8; margin-top: 0; font-size: 20px; border-bottom: 2px solid #e8f0fe; padding-bottom: 8px; }
+        p { color: #666; font-size: 14px; margin-top: 5px; }
+        
+        /* Contenedor de Carga de Archivos y Configuración */
+        .upload-grid { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 15px 0; margin: 15px -15px; }
+        .upload-col { display: table-cell; width: 33.33%; vertical-align: top; }
+        .upload-area { border: 2px dashed #1a73e8; padding: 25px 15px; border-radius: 6px; background: #f8fafd; cursor: pointer; position: relative; text-align: center; height: 80px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .upload-area:hover { background: #f1f6fe; }
+        .upload-area input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .file-status { font-size: 13px; font-weight: bold; color: #137333; margin-top: 5px; display: none; }
+        
+        /* Inputs de Configuración de Imágenes */
+        .img-config-box { background: #fdfdfd; border: 1px solid #ccd1d9; border-radius: 6px; padding: 12px; height: 86px; display: flex; flex-direction: column; justify-content: center; }
+        .img-config-box label { display: block; font-size: 11px; font-weight: 600; color: #444; margin-bottom: 6px; text-transform: uppercase; }
+        .img-config-box input { width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+
+        /* Panel de Filtros con Soporte Multiselección Avanzado */
+        .filter-grid { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 12px 0; margin-bottom: 15px; }
+        .filter-col { display: table-cell; vertical-align: top; }
+        .filter-col label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px; text-transform: uppercase; }
+        .filter-col select { width: 100%; padding: 6px; border: 1px solid #ccd1d9; border-radius: 4px; font-size: 13px; background-color: #fff; height: 130px; }
+        
+        /* Botones */
+        .actions-bar { text-align: right; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+        .btn { background-color: #1a73e8; color: white; border: none; padding: 10px 22px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; margin-left: 10px; }
+        .btn:hover { background-color: #1557b0; }
+        .btn-secondary { background-color: #5c6bc0; }
+        .btn-secondary:hover { background-color: #3f51b5; }
+        
+        #mensaje { font-size: 14px; font-weight: 500; padding: 12px; border-radius: 4px; margin-bottom: 20px; display: none; text-align: center; }
+        .success { background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+        .error { background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf; }
+
+        /* --- ESTILOS DEL PREVIEW DEL CATÁLOGO EN PANTALLA --- */
+        .preview-header-title { font-size: 18px; color: #333; margin: 10px 0; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
+        .catalog-container { background: #fafafa; border: 1px solid #e0e0e0; padding: 20px; border-radius: 6px; max-height: 600px; overflow-y: auto; }
+        
+        /* --- DISEÑO SÚPER PROFESIONAL DEL CATÁLOGO --- */
+        .product-card { background: #fff; border: 2px solid #7f8c8d; border-radius: 6px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: block; overflow: hidden; page-break-inside: avoid; }
+        .product-layout { display: table; width: 100%; table-layout: fixed; }
+        
+        /* Recuadro de Imagen Estanco Compacto */
+        .product-img-box { display: table-cell; width: 130px; height: 130px; background: #fdfdfd; border-right: 2px solid #7f8c8d; text-align: center; vertical-align: middle; position: relative; overflow: hidden; }
+        .img-placeholder-text { padding: 8px; color: #7f8c8d; font-size: 10px; font-weight: 700; line-height: 1.3; text-transform: uppercase; word-break: break-word; }
+        
+        /* Información de Producto */
+        .product-details { display: table-cell; vertical-align: top; padding: 10px 15px; }
+        .prod-header { margin-bottom: 6px; }
+        .prod-title { font-size: 15px; font-weight: 700; color: #111; margin: 0 0 2px 0; text-transform: uppercase; }
+        .prod-subtitle { font-size: 12px; color: #555; margin: 0; font-weight: 500; }
+        
+        /* Badges de Información Planos */
+        .tags-row { margin-bottom: 8px; }
+        .tag-badge { display: inline-block; background: #f1f3f4; color: #3c4043; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-right: 6px; font-weight: 600; border: 1px solid #dadce0; text-transform: uppercase; }
+        .tag-badge-v2 { background: #e8f0fe; color: #1a73e8; border-color: #d2e3fc; }
+        .tag-badge-venta { background: #e6f4ea; color: #137333; border-color: #ceead6; } /* Estilo Verde para Tipo de Venta */
+        
+        /* Matriz de Talles Horizontal */
+        .size-matrix { display: block; margin-top: 6px; }
+        .size-box { display: inline-block; border: 1px solid #cfd8dc; border-radius: 4px; text-align: center; margin-right: 5px; margin-bottom: 4px; min-width: 44px; overflow: hidden; background: #fff; }
+        .size-name { background: #f5f7f8; font-size: 10px; font-weight: 700; color: #37474f; padding: 2px 4px; border-bottom: 1px solid #cfd8dc; text-transform: uppercase; }
+        .size-qty { font-size: 12px; font-weight: bold; color: #111; padding: 3px 4px; background: #fff; }
+        
+        /* Sección de Precios Financieros */
+        .product-prices { display: table-cell; width: 160px; vertical-align: middle; text-align: right; padding: 10px 20px 10px 10px; background: #fafbfc; border-left: 1px solid #f0f0f0; }
+        .price-regular { font-size: 13px; color: #7f8c8d; text-decoration: line-through; margin-bottom: 1px; font-weight: 500; }
+        .price-main { font-size: 18px; font-weight: 800; color: #2c3e50; }
+        .price-promo { font-size: 20px; font-weight: 800; color: #d9383a; }
+        .promo-label { display: inline-block; background: #fce8e6; color: #c5221f; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-top: 2px; text-transform: uppercase; }
+
+        /* --- CONFIGURACIÓN ESTRICTA DE IMPRESIÓN (PDF COMPACTO DE ALTA DEFINICIÓN) --- */
+        @media print {
+            body { background: white !important; padding: 0 !important; margin: 0 !important; font-size: 11pt; }
+            .no-print-container { display: none !important; }
+            .catalog-container { background: transparent !important; border: none !important; padding: 0 !important; max-height: none !important; overflow-y: visible !important; }
+            
+            /* Separación al mínimo absoluto y línea de recuadro gruesa definida para evitar desperdicio de hojas */
+            .product-card { border: 2px solid #2c3e50 !important; box-shadow: none !important; page-break-inside: avoid !important; margin-bottom: 1.5mm !important; }
+            .product-img-box { border-right: 2px solid #2c3e50 !important; background: #fff !important; }
+            .product-prices { background: transparent !important; }
+            @page { size: A4; margin: 8mm 8mm; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="no-print-container">
+    <div id="mensaje"></div>
+
+    <div class="card">
+        <h2>1. Parámetros Base y Carga de Orígenes</h2>
+        <p>Subí tus matrices operativas y definí la ubicación de tus imágenes en la nube o disco local.</p>
+        
+        <div class="upload-grid">
+            <div class="upload-col">
+                <div class="upload-area" id="dropZoneStock">
+                    <span id="txtStock">📦 Cargar Archivo de Stock (Bloques)</span>
+                    <input type="file" id="fileStock" accept=".xlsx, .xls">
+                </div>
+                <div id="statusStock" class="file-status">✓ Stock cargado</div>
+            </div>
+            
+            <div class="upload-col">
+                <div class="upload-area" id="dropZonePrecios">
+                    <span id="txtPrecios">💰 Cargar Lista de Precios Maestros</span>
+                    <input type="file" id="filePrecios" accept=".xlsx, .xls">
+                </div>
+                <div id="statusPrecios" class="file-status">✓ Precios cargados</div>
+            </div>
+
+            <div class="upload-col">
+                <div class="img-config-box">
+                    <label for="rutaImagenes">URL Base / Ruta de Imágenes</label>
+                    <input type="text" id="rutaImagenes" placeholder="Ej: ./ o URL de Apps Script" oninput="ejecutarFiltrosMapeados()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="panelFiltros" style="opacity: 0.5; pointer-events: none;">
+        <h2>2. Panel de Segmentación y Filtros Avanzados</h2>
+        <p style="font-size: 13px; color: #1a73e8; margin-bottom: 12px; font-weight: 500;">💡 Haz clic directo en varios ítems para combinarlos en el catálogo. Al presionar "-- TODOS --" se limpia el filtro.</p>
+        
+        <div class="filter-grid">
+            <div class="filter-col">
+                <label for="selArticulo">Artículo</label>
+                <select id="selArticulo" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select>
+            </div>
+            <div class="filter-col">
+                <label for="selColor">Color</label>
+                <select id="selColor" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select>
+            </div>
+            <div class="filter-col">
+                <label for="selMarca">Marca</label>
+                <select id="selMarca" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select>
+            </div>
+            <div class="filter-col">
+                <label for="selMarcaV2">Marca Versión 2</label>
+                <select id="selMarcaV2" multiple onchange="ejecutarFiltrosMapeados()"><option value="TODOS" selected>-- TODOS --</option></select>
+            </div>
+        </div>
+        
+        <div class="actions-bar">
+            <button class="btn btn-secondary" onclick="limpiarSelectoresFiltros()">Restablecer Filtros</button>
+            <button class="btn" id="btnPdf" onclick="window.print()">Generar PDF Corporativo</button>
+        </div>
+    </div>
+    
+    <div class="preview-header-title" id="previewTitle" style="display:none;">
+        <span>Vista Previa del Catálogo (<span id="cantResultados">0</span> ítems mapeados)</span>
+    </div>
+</div>
+
+<div class="catalog-container" id="vistaCatalogo" style="display:none;">
+    </div>
+
+<script>
+    // Almacenamiento Global de Objetos Consolidados
+    var globalStockRaw = [];
+    var globalPreciosMap = {};
+    var globalMasterData = []; 
+    
+    var fileStock = document.getElementById('fileStock');
+    var filePrecios = document.getElementById('filePrecios');
+
+    fileStock.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) procesarExcelStock(e.target.files[0]);
+    });
+
+    filePrecios.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) procesarExcelPrecios(e.target.files[0]);
+    });
+
+    function mostrarFeedback(texto, tipo) {
+        var msg = document.getElementById('mensaje');
+        msg.innerText = texto;
+        msg.className = tipo;
+        msg.style.display = 'block';
+    }
+
+    function ocultarFeedback() {
+        document.getElementById('mensaje').style.display = 'none';
+    }
+
+    function obtenerValorCelda(hoja, r, c) {
+        var direccionCelda = XLSX.utils.encode_cell({r: r, c: c});
+        var celda = hoja[direccionCelda];
+        return (celda && celda.v !== undefined) ? celda.v.toString().trim() : "";
+    }
+
+    // PROCESADOR DE LA MATRIZ DE STOCK POR BLOQUES
+    function procesarExcelStock(archivo) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, {type: 'array'});
+                var hojaOrig = workbook.Sheets[workbook.SheetNames[0]];
+                var rango = XLSX.utils.decode_range(hojaOrig['!ref']);
+                
+                globalStockRaw = [];
+                var codigoArticuloActual = "";
+                var arrayTallesActuales = [];
+                
+                for (var r = 0; r <= rango.e.r; r++) {
+                    var valA = obtenerValorCelda(hojaOrig, r, 0); 
+                    var valB = obtenerValorCelda(hojaOrig, r, 1); 
+                    var valC = obtenerValorCelda(hojaOrig, r, 2); 
+                    var valD = obtenerValorCelda(hojaOrig, r, 3); 
+                    
+                    if (valA === "" && valB === "" && valC === "" && valD === "") continue;
+                    
+                    if (valA !== "" && valB !== "" && valC === "" && valD === "") {
+                        codigoArticuloActual = valA;
+                        arrayTallesActuales = [];
+                        for (var c = 4; c <= 18; c++) {
+                            arrayTallesActuales[c] = obtenerValorCelda(hojaOrig, r, c);
+                        }
+                        continue;
+                    }
+                    
+                    if (codigoArticuloActual !== "") {
+                        var codigoColor = valA;
+                        var nombreColor = valB;
+                        var marca = valC;
+                        
+                        for (var c = 4; c <= 18; c++) {
+                            var cantidadRaw = obtenerValorCelda(hojaOrig, r, c);
+                            var talleAsociado = arrayTallesActuales[c] || "";
+                            
+                            if (cantidadRaw !== "" && !isNaN(cantidadRaw) && talleAsociado !== "") {
+                                var cantidadNum = Number(cantidadRaw);
+                                if (cantidadNum > 0) {
+                                    globalStockRaw.push({
+                                        articulo: codigoArticuloActual,
+                                        codigoColor: codigoColor,
+                                        color: nombreColor,
+                                        marca: marca || "N/A",
+                                        talle: talleAsociado,
+                                        cantidad: cantidadNum
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                document.getElementById('statusStock').style.display = 'block';
+                document.getElementById('txtStock').innerText = "📄 " + archivo.name;
+                verificarConsolidacion();
+            } catch (err) {
+                mostrarFeedback("Error al decodificar archivo de Stock: " + err.message, "error");
+            }
+        };
+        reader.readAsArrayBuffer(archivo);
+    }
+
+    // PROCESADOR MAESTRO DE LA LISTA DE PRECIOS (EXTRACCIÓN COLUMNAS A, D, H, I y J)
+    function procesarExcelPrecios(archivo) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, {type: 'array'});
+                var hojaPrecios = workbook.Sheets[workbook.SheetNames[0]]; 
+                var rango = XLSX.utils.decode_range(hojaPrecios['!ref']);
+                
+                globalPreciosMap = {};
+                
+                for (var r = 0; r <= rango.e.r; r++) {
+                    var artId = obtenerValorCelda(hojaPrecios, r, 0); 
+                    if (artId === "" || r === 0) continue;            
+                    
+                    var precioReg = obtenerValorCelda(hojaPrecios, r, 3);    // Columna D (Precio)
+                    var marcaV2 = obtenerValorCelda(hojaPrecios, r, 7);      // Columna H (Marca V2)
+                    var precioPromo = obtenerValorCelda(hojaPrecios, r, 8);   // Columna I (Promo)
+                    var tipoVenta = obtenerValorCelda(hojaPrecios, r, 9);     // Columna J (Tipo de Venta)
+                    
+                    globalPreciosMap[artId] = {
+                        precio: (precioReg !== "" && !isNaN(precioReg)) ? Number(precioReg) : 0,
+                        marcaV2: marcaV2 || "N/A",
+                        precioPromo: (precioPromo !== "" && !isNaN(precioPromo)) ? Number(precioPromo) : 0,
+                        tipoVenta: tipoVenta || "libre"
+                    };
+                }
+                document.getElementById('statusPrecios').style.display = 'block';
+                document.getElementById('txtPrecios').innerText = "📄 " + archivo.name;
+                verificarConsolidacion();
+            } catch (err) {
+                mostrarFeedback("Error al decodificar la lista de Precios: " + err.message, "error");
+            }
+        };
+        reader.readAsArrayBuffer(archivo);
+    }
+
+    // VERIFICADOR Y CONSOLIDATOR DE ESTRUCTURA INTEGRAL
+    function verificarConsolidacion() {
+        if (globalStockRaw.length === 0 || Object.keys(globalPreciosMap).length === 0) return;
+        
+        ocultarFeedback();
+        var mapaAgrupado = {};
+        
+        globalStockRaw.forEach(function(st) {
+            var claveUnica = st.articulo + "|||" + st.codigoColor;
+            
+            if (!mapaAgrupado[claveUnica]) {
+                var datosPrecio = globalPreciosMap[st.articulo] || { precio: 0, marcaV2: "N/A", precioPromo: 0, tipoVenta: "libre" };
+                
+                mapaAgrupado[claveUnica] = {
+                    articulo: st.articulo,
+                    codigoColor: st.codigoColor,
+                    color: st.color,
+                    marca: st.marca,
+                    marcaV2: datosPrecio.marcaV2,
+                    precio: datosPrecio.precio,
+                    precioPromo: datosPrecio.precioPromo,
+                    tipoVenta: datosPrecio.tipoVenta,
+                    tallesData: []
+                };
+            }
+            
+            mapaAgrupado[claveUnica].tallesData.push({
+                talle: st.talle,
+                cantidad: st.cantidad
+            });
+        });
+        
+        globalMasterData = Object.keys(mapaAgrupado).map(function(k) { return mapaAgrupado[k]; });
+        
+        inyectarSelectoresDeFiltros();
+        document.getElementById('panelFiltros').style.pointerEvents = 'auto';
+        document.getElementById('panelFiltros').style.opacity = '1';
+        
+        document.getElementById('previewTitle').style.display = 'block';
+        document.getElementById('vistaCatalogo').style.display = 'block';
+        
+        ejecutarFiltrosMapeados();
+        mostrarFeedback("¡Estructuras de datos vinculadas y consolidadas con éxito!", "success");
+    }
+
+    // CONSTRUCTOR EXCLUSIVO DE LISTADOS DESPLEGABLES DINÁMICOS (CON INCLUSIÓN EXPLICITA DE N/A)
+    function inyectarSelectoresDeFiltros() {
+        var sets = { articulos: new Set(), colores: new Set(), marcas: new Set(), marcasV2: new Set() };
+        
+        globalMasterData.forEach(function(item) {
+            sets.articulos.add(item.articulo);
+            sets.colores.add(item.color);
+            sets.marcas.add(item.marca);
+            sets.marcasV2.add(item.marcaV2);
+        });
+        
+        cargarDropdownIndividual("selArticulo", sets.articulos, "Artículos");
+        cargarDropdownIndividual("selColor", sets.colores, "Colores");
+        cargarDropdownIndividual("selMarca", sets.marcas, "Marcas");
+        cargarDropdownIndividual("selMarcaV2", sets.marcasV2, "Marcas V2");
+    }
+
+    function cargarDropdownIndividual(idElemento, setValores, contexto) {
+        var el = document.getElementById(idElemento);
+        el.innerHTML = '<option value="TODOS" selected>-- TODOS --</option>';
+        
+        var ordenados = Array.from(setValores).sort();
+        ordenados.forEach(function(val) {
+            if(val !== "") { 
+                var opt = document.createElement('option');
+                opt.value = val;
+                // Si es N/A le damos un formato más amigable e intuitivo
+                opt.innerText = (val === "N/A") ? "N/A (Sin Especificar)" : val;
+                el.appendChild(opt);
+            }
+        });
+    }
+
+    function limpiarSelectoresFiltros() {
+        var ids = ['selArticulo', 'selColor', 'selMarca', 'selMarcaV2'];
+        ids.forEach(function(id) {
+            var el = document.getElementById(id);
+            for (var i = 0; i < el.options.length; i++) {
+                el.options[i].selected = (el.options[i].value === "TODOS");
+            }
+        });
+        ejecutarFiltrosMapeados();
+    }
+
+    // LECTURA AVANZADA DE VALORES MATRICIALES SELECCIONADOS
+    function obtenerValoresSeleccionados(idSelector) {
+        var el = document.getElementById(idSelector);
+        var valores = [];
+        for (var i = 0; i < el.options.length; i++) {
+            if (el.options[i].selected) {
+                valores.push(el.options[i].value);
+            }
+        }
+        if (valores.length === 0 || valores.includes("TODOS")) {
+            return ["TODOS"];
+        }
+        return valores;
+    }
+
+    // MOTOR LÓGICO DE FILTRADO MULTI-ITEM EN TIEMPO REAL
+    function ejecutarFiltrosMapeados() {
+        var fArt = obtenerValoresSeleccionados('selArticulo');
+        var fCol = obtenerValoresSeleccionados('selColor');
+        var fMrc = obtenerValoresSeleccionados('selMarca');
+        var fMv2 = obtenerValoresSeleccionados('selMarcaV2');
+        
+        var registrosFiltrados = globalMasterData.filter(function(item) {
+            if (!fArt.includes("TODOS") && !fArt.includes(item.articulo)) return false;
+            if (!fCol.includes("TODOS") && !fCol.includes(item.color)) return false;
+            if (!fMrc.includes("TODOS") && !fMrc.includes(item.marca)) return false;
+            if (!fMv2.includes("TODOS") && !fMv2.includes(item.marcaV2)) return false;
+            return true;
+        });
+        
+        document.getElementById('cantResultados').innerText = registrosFiltrados.length;
+        renderizarEstructuraCatalogo(registrosFiltrados);
+    }
+
+    // MOTOR COMPLEMENTARIO DE ROTACIÓN EXCLUSIVA DE EXTENSIONES (FALLBACK SECUENCIAL)
+    function intentarSiguienteExtension(img) {
+        var extensiones = ['.jpg', '.png', '.PNG', '.jpeg', '.JPEG', '.webp', '.WEBP'];
+        var idx = parseInt(img.getAttribute('data-ext-idx'));
+        
+        if (idx < extensiones.length) {
+            var nuevaExt = extensiones[idx];
+            img.setAttribute('data-ext-idx', idx + 1);
+            
+            var base = img.getAttribute('data-base');
+            var name = img.getAttribute('data-name');
+            img.src = base + encodeURIComponent(name + nuevaExt);
+        } else {
+            img.style.display = 'none';
+            img.nextElementSibling.style.display = 'block';
+        }
+    }
+
+    // RENDERIZADOR DE FICHA TÉCNICA Y GESTIÓN DE IMÁGENES POR NOMBRE
+    function renderizarEstructuraCatalogo(datos) {
+        var contenedor = document.getElementById('vistaCatalogo');
+        contenedor.innerHTML = "";
+        
+        if (datos.length === 0) {
+            contenedor.innerHTML = '<div style="text-align:center; padding:40px; color:#999; font-style:italic;">Ningún artículo coincide con los criterios de filtrado seleccionados.</div>';
+            return;
+        }
+        
+        var baseRuta = document.getElementById('rutaImagenes').value.trim();
+        
+        datos.forEach(function(prod) {
+            var card = document.createElement('div');
+            card.className = "product-card";
+            
+            var layout = document.createElement('div');
+            layout.className = "product-layout";
+            
+            // 1. Motor de Imagen Inteligente Multi-Extensión
+            var imgBox = document.createElement('div');
+            imgBox.className = "product-img-box";
+            
+            var nombreFicheroEsperado = prod.articulo + " " + prod.color;
+            
+            if (baseRuta !== "") {
+                var rutaLimpia = baseRuta;
+                if (rutaLimpia !== "./" && !rutaLimpia.endsWith("/")) {
+                    rutaLimpia += "/";
+                }
+                var urlCompletaImg = rutaLimpia + encodeURIComponent(nombreFicheroEsperado + ".JPG");
+                
+                imgBox.innerHTML = '<img src="' + urlCompletaImg + '" ' +
+                                   'data-base="' + rutaLimpia + '" ' +
+                                   'data-name="' + nombreFicheroEsperado + '" ' +
+                                   'data-ext-idx="0" ' +
+                                   'style="width:100%; height:100%; object-fit:contain; display:block;" ' +
+                                   'onerror="intentarSiguienteExtension(this)">' +
+                                   '<div class="img-placeholder-text" style="display:none; color:#c5221f;">Falta Imagen:<br>' + nombreFicheroEsperado + '</div>';
+            } else {
+                imgBox.innerHTML = '<div class="img-placeholder-text">' + nombreFicheroEsperado + '</div>';
+            }
+            layout.appendChild(imgBox);
+            
+            // 2. Información del Producto Detallada
+            var details = document.createElement('div');
+            details.className = "product-details";
+            
+            var head = document.createElement('div');
+            head.className = "prod-header";
+            head.innerHTML = '<h3 class="prod-title">Art: ' + prod.articulo + '</h3>' + 
+                             '<p class="prod-subtitle">Color: ' + prod.color + ' <span style="color:#888;">(' + prod.codigoColor + ')</span></p>';
+            details.appendChild(head);
+            
+            // Fila de Badges
+            var tags = document.createElement('div');
+            tags.className = "tags-row";
+            tags.innerHTML = '<span class="tag-badge">' + (prod.marca || "N/A") + '</span>' + 
+                             '<span class="tag-badge tag-badge-v2">' + (prod.marcaV2 || "N/A") + '</span>' + 
+                             '<span class="tag-badge tag-badge-venta">' + prod.tipoVenta + '</span>';
+            details.appendChild(tags);
+            
+            // Matriz de Talles Horizontales Ordenados
+            var matrix = document.createElement('div');
+            matrix.className = "size-matrix";
+            
+            prod.tallesData.sort(function(a, b) { return a.talle.localeCompare(b.talle, undefined, {numeric: true, sensitivity: 'base'}); });
+            
+            prod.tallesData.forEach(function(t) {
+                var sBox = document.createElement('div');
+                sBox.className = "size-box";
+                sBox.innerHTML = '<div class="size-name">' + t.talle + '</div>' + 
+                                 '<div class="size-qty">' + t.cantidad + '</div>';
+                matrix.appendChild(sBox);
+            });
+            details.appendChild(matrix);
+            layout.appendChild(details);
+            
+            // 3. Columna Lateral de Gestión de Precios Financieros
+            var prices = document.createElement('div');
+            prices.className = "product-prices";
+            
+            if (prod.precioPromo > 0 && prod.precioPromo < prod.precio) {
+                prices.innerHTML = '<div class="price-regular">$' + prod.precio.toLocaleString('es-AR', {minimumFractionDigits: 2}) + '</div>' + 
+                                   '<div class="price-promo">$' + prod.precioPromo.toLocaleString('es-AR', {minimumFractionDigits: 2}) + '</div>' + 
+                                   '<div class="promo-label">Oferta Especial</div>';
+            } else if (prod.precio > 0) {
+                prices.innerHTML = '<div class="price-main">$' + prod.precio.toLocaleString('es-AR', {minimumFractionDigits: 2}) + '</div>';
+            } else {
+                prices.innerHTML = '<div class="price-main" style="color:#b0bec5; font-size:13px;">Consultar Precio</div>';
+            }
+            
+            layout.appendChild(prices);
+            card.appendChild(layout);
+            contenedor.appendChild(card);
+        });
+    }
+
+    // CONTROLADOR DE COMPORTAMIENTO PREMIUM PARA SELECCIÓN MÚLTIPLE DIRECTA (SIN CTRL)
+    document.addEventListener("DOMContentLoaded", function() {
+        var idsFiltros = ['selArticulo', 'selColor', 'selMarca', 'selMarcaV2'];
+        idsFiltros.forEach(function(id) {
+            var el = document.getElementById(id);
+            el.addEventListener('mousedown', function(e) {
+                var target = e.target;
+                if (target.tagName.toLowerCase() !== 'option') return;
+                
+                e.preventDefault();
+                var select = this;
+                var scroll = select.scrollTop;
+                
+                if (target.value === "TODOS") {
+                    // Si el usuario marca TODOS, limpiamos el resto de las selecciones
+                    for (var i = 0; i < select.options.length; i++) {
+                        select.options[i].selected = (select.options[i].value === "TODOS");
+                    }
+                } else {
+                    // Si marca un elemento común, conmutamos su estado y quitamos "TODOS"
+                    target.selected = !target.selected;
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value === "TODOS") {
+                            select.options[i].selected = false;
+                        }
+                    }
+                    // Protección: Si no quedó ninguno seleccionado, re-activamos TODOS automáticamente
+                    var comprobarSeleccion = false;
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].selected) comprobarSeleccion = true;
+                    }
+                    if (!comprobarSeleccion) {
+                        for (var i = 0; i < select.options.length; i++) {
+                            if (select.options[i].value === "TODOS") select.options[i].selected = true;
+                        }
+                    }
+                }
+                
+                // Mantenemos la posición del scroll de la caja estable tras los clics
+                setTimeout(function() {
+                    select.scrollTop = scroll;
+                }, 0);
+                select.focus();
+                ejecutarFiltrosMapeados();
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
